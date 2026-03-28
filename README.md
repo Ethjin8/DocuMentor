@@ -1,4 +1,4 @@
-# DocuMentor
+# LegalEase
 
 AI-powered legal document assistant for immigrants. Upload a document → instant plain-language FAQ → conversational Q&A → background legal research.
 
