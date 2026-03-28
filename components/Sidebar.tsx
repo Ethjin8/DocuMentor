@@ -40,13 +40,51 @@ export default function Sidebar() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const editInputRef = useRef<HTMLInputElement>(null);
 
   async function deleteDoc(id: string) {
     setDeletingId(id);
+    setConfirmDeleteId(null);
     await fetch(`/api/documents/${id}`, { method: "DELETE" });
     setDocs((prev) => prev.filter((d) => d.id !== id));
     if (pathname === `/document/${id}`) router.push("/workspace");
     setDeletingId(null);
+  }
+
+  async function renameDoc(id: string, newName: string) {
+    const trimmed = newName.trim();
+    if (!trimmed) { setEditingId(null); return; }
+    const original = docs.find((d) => d.id === id)?.file_name;
+    if (trimmed === original) { setEditingId(null); return; }
+
+    setDocs((prev) => prev.map((d) => d.id === id ? { ...d, file_name: trimmed } : d));
+    setEditingId(null);
+    window.dispatchEvent(new CustomEvent("doc-renamed", { detail: { id, fileName: trimmed } }));
+
+    await fetch(`/api/documents/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ file_name: trimmed }),
+    });
+  }
+
+  // Listen for renames from the document page
+  useEffect(() => {
+    function onRenamed(e: Event) {
+      const { id, fileName } = (e as CustomEvent).detail;
+      setDocs((prev) => prev.map((d) => d.id === id ? { ...d, file_name: fileName } : d));
+    }
+    window.addEventListener("doc-renamed", onRenamed);
+    return () => window.removeEventListener("doc-renamed", onRenamed);
+  }, []);
+
+  function startEditing(doc: DocEntry) {
+    setEditingId(doc.id);
+    setEditValue(doc.file_name);
+    setTimeout(() => editInputRef.current?.select(), 0);
   }
 
   useEffect(() => {
@@ -208,11 +246,8 @@ export default function Sidebar() {
           <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
             {filtered.map((doc) => {
               const active = pathname === `/document/${doc.id}`;
-              const name = doc.file_name.length > 28
-                ? doc.file_name.slice(0, 26) + "…"
-                : doc.file_name;
-
               const isDeleting = deletingId === doc.id;
+              const isEditing = editingId === doc.id;
 
               return (
                 <div
@@ -230,34 +265,65 @@ export default function Sidebar() {
                     if (!active) e.currentTarget.style.background = "transparent";
                   }}
                 >
-                  <Link
-                    href={`/document/${doc.id}`}
-                    title={doc.file_name}
-                    style={{
-                      flex: 1,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.55rem",
-                      padding: "0.5rem 2rem 0.5rem 0.75rem",
-                      borderRadius: 8,
-                      textDecoration: "none",
-                      fontSize: "0.875rem",
-                      color: active ? "#2563eb" : "#374151",
-                      background: active ? "#eff6ff" : "transparent",
-                      fontWeight: active ? 600 : 400,
-                      minWidth: 0,
-                    }}
-                  >
-                    <span style={{ color: active ? "#2563eb" : "#9ca3af", flexShrink: 0 }}>
-                      <FileIcon />
-                    </span>
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {name}
-                    </span>
-                  </Link>
+                  {isEditing ? (
+                    <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "0.55rem", padding: "0.35rem 0.75rem" }}>
+                      <span style={{ color: "#2563eb", flexShrink: 0 }}><FileIcon /></span>
+                      <input
+                        ref={editInputRef}
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") renameDoc(doc.id, editValue);
+                          if (e.key === "Escape") setEditingId(null);
+                        }}
+                        onBlur={() => renameDoc(doc.id, editValue)}
+                        style={{
+                          flex: 1,
+                          fontSize: "0.875rem",
+                          border: "1.5px solid #2563eb",
+                          borderRadius: 6,
+                          padding: "0.25rem 0.5rem",
+                          outline: "none",
+                          background: "#fff",
+                          color: "#1a1a2e",
+                          minWidth: 0,
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <Link
+                      href={`/document/${doc.id}`}
+                      title={doc.file_name}
+                      onDoubleClick={(e) => {
+                        e.preventDefault();
+                        startEditing(doc);
+                      }}
+                      style={{
+                        flex: 1,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.55rem",
+                        padding: "0.5rem 2rem 0.5rem 0.75rem",
+                        borderRadius: 8,
+                        textDecoration: "none",
+                        fontSize: "0.875rem",
+                        color: active ? "#2563eb" : "#374151",
+                        background: active ? "#eff6ff" : "transparent",
+                        fontWeight: active ? 600 : 400,
+                        minWidth: 0,
+                      }}
+                    >
+                      <span style={{ color: active ? "#2563eb" : "#9ca3af", flexShrink: 0 }}>
+                        <FileIcon />
+                      </span>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {doc.file_name}
+                      </span>
+                    </Link>
+                  )}
                   <button
                     className="doc-delete"
-                    onClick={() => deleteDoc(doc.id)}
+                    onClick={() => setConfirmDeleteId(doc.id)}
                     disabled={isDeleting}
                     title="Delete document"
                     style={{
@@ -362,6 +428,71 @@ export default function Sidebar() {
           Sign Out
         </button>
       </div>
+      {/* ── Delete confirmation modal ── */}
+      {confirmDeleteId && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.4)",
+            zIndex: 100,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+          onClick={() => setConfirmDeleteId(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: 14,
+              padding: "1.75rem",
+              width: 340,
+              boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
+            }}
+          >
+            <h3 style={{ fontSize: "1rem", fontWeight: 700, color: "#1a1a2e", marginBottom: "0.5rem" }}>
+              Delete document?
+            </h3>
+            <p style={{ fontSize: "0.85rem", color: "#6b7280", lineHeight: 1.6, marginBottom: "1.25rem" }}>
+              &ldquo;{docs.find((d) => d.id === confirmDeleteId)?.file_name}&rdquo; will be permanently deleted. This cannot be undone.
+            </p>
+            <div style={{ display: "flex", gap: "0.6rem", justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setConfirmDeleteId(null)}
+                style={{
+                  padding: "0.5rem 1rem",
+                  borderRadius: 8,
+                  border: "1.5px solid #e5e7eb",
+                  background: "#fff",
+                  color: "#374151",
+                  fontSize: "0.85rem",
+                  fontWeight: 500,
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => deleteDoc(confirmDeleteId)}
+                style={{
+                  padding: "0.5rem 1rem",
+                  borderRadius: 8,
+                  border: "none",
+                  background: "#dc2626",
+                  color: "#fff",
+                  fontSize: "0.85rem",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </aside>
   );
 }

@@ -50,7 +50,7 @@ export default function WorkspaceView() {
           Legal<span style={{ color: "#2563eb" }}>Ease</span>
         </h1>
         <p style={{ color: "#4b5563", marginBottom: "2.5rem", fontSize: "1.1rem", fontWeight: 300, letterSpacing: "0.04em" }}>
-          Upload a legal document. We&apos;ll explain it in plain language — no jargon.
+          Upload a legal document. We&apos;ll explain it in any language — no jargon.
         </p>
 
         <DocumentUpload onUpload={handleUpload} loading={loading} />

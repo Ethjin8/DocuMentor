@@ -8,14 +8,12 @@ import { GeminiLiveClient, VoiceState } from "@/lib/gemini-live";
 import { createClient } from "@/lib/supabase/client";
 import type { Document, FAQ, ChatMessage } from "@/types";
 
-type View = "faq" | "key_dates" | "obligations" | "raw" | "ask";
+type View = "faq" | "raw" | "ask";
 
 const VIEW_OPTIONS: { value: View; label: string }[] = [
-  { value: "faq",         label: "Overview" },
-  { value: "ask",         label: "Ask AI" },
-  { value: "key_dates",   label: "Key Dates" },
-  { value: "obligations", label: "Your Obligations" },
-  { value: "raw",         label: "Full Text" },
+  { value: "faq",  label: "Overview" },
+  { value: "ask",  label: "Ask AI" },
+  { value: "raw",  label: "Full Text" },
 ];
 
 interface Props {
@@ -25,6 +23,40 @@ interface Props {
 
 export default function DocumentDetailView({ doc, faq }: Props) {
   const [view, setView] = useState<View>("faq");
+  const [fileName, setFileName] = useState(doc.file_name);
+  const [editingName, setEditingName] = useState(false);
+  const [editValue, setEditValue] = useState("");
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  function startEditing() {
+    setEditingName(true);
+    setEditValue(fileName);
+    setTimeout(() => nameInputRef.current?.select(), 0);
+  }
+
+  async function saveName(newName: string) {
+    const trimmed = newName.trim();
+    setEditingName(false);
+    if (!trimmed || trimmed === fileName) return;
+
+    setFileName(trimmed);
+    window.dispatchEvent(new CustomEvent("doc-renamed", { detail: { id: doc.id, fileName: trimmed } }));
+    await fetch(`/api/documents/${doc.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ file_name: trimmed }),
+    });
+  }
+
+  // Listen for renames from the sidebar
+  useEffect(() => {
+    function onRenamed(e: Event) {
+      const { id, fileName: newName } = (e as CustomEvent).detail;
+      if (id === doc.id) setFileName(newName);
+    }
+    window.addEventListener("doc-renamed", onRenamed);
+    return () => window.removeEventListener("doc-renamed", onRenamed);
+  }, [doc.id]);
 
   // Voice state — owned here so MicOverlay + VoiceChat share it
   const [voiceState, setVoiceState] = useState<VoiceState>("idle");
@@ -86,9 +118,62 @@ export default function DocumentDetailView({ doc, faq }: Props) {
         <p style={{ fontSize: "0.75rem", color: "#9ca3af", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
           Document
         </p>
-        <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "1.35rem", fontWeight: 400, color: "#1a1a2e", wordBreak: "break-word" }}>
-          {doc.file_name}
-        </h1>
+        {editingName ? (
+          <input
+            ref={nameInputRef}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") saveName(editValue);
+              if (e.key === "Escape") setEditingName(false);
+            }}
+            onBlur={() => saveName(editValue)}
+            style={{
+              fontFamily: "'DM Serif Display', serif",
+              fontSize: "1.35rem",
+              fontWeight: 400,
+              color: "#1a1a2e",
+              border: "1.5px solid #2563eb",
+              borderRadius: 8,
+              padding: "0.2rem 0.5rem",
+              outline: "none",
+              width: "100%",
+              background: "#fff",
+            }}
+          />
+        ) : (
+          <div
+            style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}
+            onDoubleClick={startEditing}
+          >
+            <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "1.35rem", fontWeight: 400, color: "#1a1a2e", wordBreak: "break-word", margin: 0 }}>
+              {fileName}
+            </h1>
+            <button
+              onClick={startEditing}
+              title="Rename document"
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                padding: "0.2rem",
+                borderRadius: 4,
+                color: "#9ca3af",
+                display: "flex",
+                alignItems: "center",
+                transition: "color 0.15s",
+                flexShrink: 0,
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#2563eb")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "#9ca3af")}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                <path d="m15 5 4 4" />
+              </svg>
+            </button>
+          </div>
+        )}
         {doc.created_at && (
           <p style={{ fontSize: "0.8rem", color: "#9ca3af", marginTop: "0.2rem" }}>
             Uploaded {new Date(doc.created_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
@@ -125,53 +210,6 @@ export default function DocumentDetailView({ doc, faq }: Props) {
       {/* ── Content area ── */}
       <div>
         {view === "faq" && <FAQPanel faq={faq} />}
-
-        {view === "key_dates" && (
-          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "1.5rem" }}>
-            <h2 style={{ fontSize: "1rem", fontWeight: 700, color: "#1a1a2e", marginBottom: "1rem" }}>Key Dates</h2>
-            {faq && faq.key_dates.length > 0 ? (
-              <ul style={{ display: "flex", flexDirection: "column", gap: "0.6rem", paddingLeft: 0, listStyle: "none" }}>
-                {faq.key_dates.map((date, i) => (
-                  <li key={i} style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start" }}>
-                    <span style={{
-                      width: 24, height: 24, borderRadius: "50%",
-                      background: "#eff6ff", color: "#2563eb",
-                      fontSize: "0.75rem", fontWeight: 700,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      flexShrink: 0, marginTop: "0.05rem",
-                    }}>
-                      {i + 1}
-                    </span>
-                    <span style={{ color: "#374151", lineHeight: 1.6 }}>{date}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p style={{ color: "#9ca3af", fontSize: "0.9rem" }}>No key dates found in this document.</p>
-            )}
-          </div>
-        )}
-
-        {view === "obligations" && (
-          <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "1.5rem" }}>
-            <h2 style={{ fontSize: "1rem", fontWeight: 700, color: "#1a1a2e", marginBottom: "1rem" }}>Your Obligations</h2>
-            {faq && faq.obligations.length > 0 ? (
-              <ul style={{ display: "flex", flexDirection: "column", gap: "0.6rem", paddingLeft: 0, listStyle: "none" }}>
-                {faq.obligations.map((item, i) => (
-                  <li key={i} style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start" }}>
-                    <span style={{
-                      width: 8, height: 8, borderRadius: "50%",
-                      background: "#2563eb", flexShrink: 0, marginTop: "0.45rem",
-                    }} />
-                    <span style={{ color: "#374151", lineHeight: 1.6 }}>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p style={{ color: "#9ca3af", fontSize: "0.9rem" }}>No obligations found in this document.</p>
-            )}
-          </div>
-        )}
 
         {view === "ask" && (
           <VoiceChat
