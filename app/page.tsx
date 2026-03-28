@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import WorkspaceView from "@/components/WorkspaceView";
 import AuthModal from "@/components/AuthModal";
+import Sidebar from "@/components/Sidebar";
+import WorkspaceView from "@/components/WorkspaceView";
 
 type IconType = "globe" | "house" | "briefcase" | "dollar" | "shield" | "scales" | "heart" | "graduation";
 
@@ -123,12 +124,12 @@ function Waveform() {
   );
 }
 
+type View = "landing" | "workspace";
 type TransitionPhase = "idle" | "closing" | "opening";
-type HomeView = "landing" | "workspace";
 
 export default function HomePage() {
+  const [view, setView] = useState<View>("landing");
   const [phase, setPhase] = useState<TransitionPhase>("idle");
-  const [view, setView] = useState<HomeView>("landing");
   const [showAuth, setShowAuth] = useState(false);
 
   function handleGetStarted() {
@@ -139,14 +140,10 @@ export default function HomePage() {
     setShowAuth(false);
     if (phase !== "idle") return;
     setPhase("closing");
-
     setTimeout(() => {
       setView("workspace");
       setPhase("opening");
-
-      setTimeout(() => {
-        setPhase("idle");
-      }, 700);
+      setTimeout(() => setPhase("idle"), 700);
     }, 700);
   }
 
@@ -215,7 +212,12 @@ export default function HomePage() {
           </div>
         </main>
       ) : (
-        <WorkspaceView />
+        <div style={{ display: "flex", minHeight: "100vh", background: "#f9fafb" }}>
+          <Sidebar />
+          <div style={{ flex: 1, minWidth: 0, overflowY: "auto" }}>
+            <WorkspaceView />
+          </div>
+        </div>
       )}
     </>
   );
