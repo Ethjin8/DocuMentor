@@ -80,10 +80,15 @@ export class GeminiLiveClient {
       };
 
       source.connect(this.workletNode);
-      this.workletNode.connect(this.audioContext.destination); // needed to keep the worklet alive
+      // Connect worklet to destination via silent gain node to keep it alive without audio feedback
+      const silencer = this.audioContext.createGain();
+      silencer.gain.value = 0;
+      this.workletNode.connect(silencer);
+      silencer.connect(this.audioContext.destination);
 
       // Open WebSocket to proxy
-      const proxyUrl = `ws://localhost:${process.env.NEXT_PUBLIC_PROXY_PORT || 3001}`;
+      const proxyPort = process.env.NEXT_PUBLIC_PROXY_PORT ?? "3001";
+      const proxyUrl = `ws://localhost:${proxyPort}`;
       this.ws = new WebSocket(proxyUrl);
 
       this.ws.onopen = () => {
@@ -91,8 +96,12 @@ export class GeminiLiveClient {
       };
 
       this.ws.onmessage = (e: MessageEvent) => {
-        const msg = JSON.parse(e.data);
-        this.handleServerMessage(msg);
+        try {
+          const msg = JSON.parse(e.data);
+          this.handleServerMessage(msg);
+        } catch {
+          this.emit("error", "Received invalid message from server");
+        }
       };
 
       this.ws.onerror = () => {
