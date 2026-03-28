@@ -6,12 +6,11 @@ type Phase = "hidden" | "covered" | "revealing";
 
 export default function TransitionReveal() {
   const [phase, setPhase] = useState<Phase>("covered");
+  const [showLoader, setShowLoader] = useState(false);
 
   useEffect(() => {
     if (sessionStorage.getItem("doReveal") === "1") {
       sessionStorage.removeItem("doReveal");
-      // Two rAFs ensure the browser has painted the covered state before
-      // we add the reveal animation class.
       requestAnimationFrame(() => {
         requestAnimationFrame(() => setPhase("revealing"));
       });
@@ -26,6 +25,16 @@ export default function TransitionReveal() {
     return () => clearTimeout(timer);
   }, [phase]);
 
+  // Show loading dot if stuck in covered state for 400ms+
+  useEffect(() => {
+    if (phase !== "covered") {
+      setShowLoader(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowLoader(true), 400);
+    return () => clearTimeout(timer);
+  }, [phase]);
+
   if (phase === "hidden") return null;
 
   const cls =
@@ -35,6 +44,7 @@ export default function TransitionReveal() {
     <div className={cls} style={{ pointerEvents: "none" }}>
       <div className="transition-panel transition-panel--left" />
       <div className="transition-panel transition-panel--right" />
+      {showLoader && <div className="transition-loader" />}
     </div>
   );
 }
