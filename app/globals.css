@@ -199,6 +199,15 @@ a:hover {
   transform: translateX(100%);
 }
 
+/* Panels held fully closed, no animation — used on the receiving page */
+.transition-overlay.covered .transition-panel--left {
+  transform: translateX(0);
+}
+
+.transition-overlay.covered .transition-panel--right {
+  transform: translateX(0);
+}
+
 .transition-overlay.active .transition-panel--left {
   animation: curtainLeft 0.7s cubic-bezier(0.65, 0, 0.35, 1) forwards;
 }

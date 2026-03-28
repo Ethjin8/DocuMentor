@@ -1,7 +1,7 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
-import WorkspaceView from "@/components/WorkspaceView";
 
 type IconType = "globe" | "house" | "briefcase" | "dollar" | "shield" | "scales" | "heart" | "graduation";
 
@@ -122,20 +122,18 @@ function Waveform() {
   );
 }
 
-type View = "landing" | "upload";
 type TransitionPhase = "idle" | "closing" | "opening";
 
 export default function HomePage() {
-  const [view, setView] = useState<View>("landing");
+  const router = useRouter();
   const [phase, setPhase] = useState<TransitionPhase>("idle");
 
   function handleGetStarted() {
     if (phase !== "idle") return;
     setPhase("closing");
     setTimeout(() => {
-      setView("upload");
-      setPhase("opening");
-      setTimeout(() => setPhase("idle"), 700);
+      sessionStorage.setItem("doReveal", "1");
+      router.push("/workspace");
     }, 700);
   }
 
@@ -153,83 +151,48 @@ export default function HomePage() {
         </div>
       )}
 
-      {view === "landing" ? (
-        <main className="landing">
-          <div className="card-layer">
-            {CARDS.map((card, i) => (
-              <div
-                key={i}
-                className="float-card"
-                style={{
-                  top: card.top,
-                  left: card.left,
-                  background: `${card.color}30`,
-                  border: `1px solid ${card.color}50`,
-                  color: card.color,
-                  animation: card.animation,
-                }}
-              >
-                <CardIcon type={card.icon} />
-                <span className="float-card-label" style={{ color: card.color }}>
-                  {card.category}
-                </span>
-                <div className="float-card-lines">
-                  <div className="float-card-line" style={{ background: card.color, width: "90%" }} />
-                  <div className="float-card-line" style={{ background: card.color, width: "70%" }} />
-                  <div className="float-card-line" style={{ background: card.color, width: "80%" }} />
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="landing-content">
-            <h1 className="landing-title">Docu<span style={{ color: "#2563eb" }}>Mentor</span></h1>
-            <p className="landing-tagline">
-              Understand your legal documents — no jargon, no stress.
-            </p>
-            <Waveform />
-            <button
-              className="landing-cta"
-              onClick={handleGetStarted}
+      <main className="landing">
+        <div className="card-layer">
+          {CARDS.map((card, i) => (
+            <div
+              key={i}
+              className="float-card"
+              style={{
+                top: card.top,
+                left: card.left,
+                background: `${card.color}30`,
+                border: `1px solid ${card.color}50`,
+                color: card.color,
+                animation: card.animation,
+              }}
             >
-              Click here to get started
-            </button>
-          </div>
-        </main>
-      ) : (
-        <WorkspaceView />
-      )}
-    </>
-    <main
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "2rem",
-      }}
-    >
-      <div style={{ maxWidth: 560, width: "100%", textAlign: "center" }}>
-        <h1 style={{ fontSize: "1.75rem", fontWeight: 600, marginBottom: "0.5rem" }}>
-          Upload a Document
-        </h1>
-        <p style={{ color: "#6b7280", marginBottom: "2.5rem", fontSize: "1.05rem" }}>
-          We&apos;ll explain it in plain language — no jargon.
-        </p>
+              <CardIcon type={card.icon} />
+              <span className="float-card-label" style={{ color: card.color }}>
+                {card.category}
+              </span>
+              <div className="float-card-lines">
+                <div className="float-card-line" style={{ background: card.color, width: "90%" }} />
+                <div className="float-card-line" style={{ background: card.color, width: "70%" }} />
+                <div className="float-card-line" style={{ background: card.color, width: "80%" }} />
+              </div>
+            </div>
+          ))}
+        </div>
 
-        <DocumentUpload onUpload={handleUpload} loading={loading} />
-
-        {error && (
-          <p style={{ color: "#dc2626", marginTop: "1rem", fontSize: "0.95rem" }}>
-            {error}
+        <div className="landing-content">
+          <h1 className="landing-title">Docu<span style={{ color: "#2563eb" }}>Mentor</span></h1>
+          <p className="landing-tagline">
+            Understand your legal documents — no jargon, no stress.
           </p>
-        )}
-
-        <p style={{ color: "#9ca3af", marginTop: "2rem", fontSize: "0.85rem" }}>
-          Supports PDF, images (JPG, PNG), and text files.
-        </p>
-      </div>
-    </main>
+          <Waveform />
+          <button
+            className="landing-cta"
+            onClick={handleGetStarted}
+          >
+            Click here to get started
+          </button>
+        </div>
+      </main>
+    </>
   );
 }
