@@ -42,15 +42,14 @@ export default function HomePage() {
         alignItems: "center",
         justifyContent: "center",
         padding: "2rem",
-        background: "#f9fafb",
       }}
     >
       <div style={{ maxWidth: 560, width: "100%", textAlign: "center" }}>
-        <h1 style={{ fontSize: "2rem", fontWeight: 600, marginBottom: "0.5rem" }}>
-          DocuMentor
+        <h1 style={{ fontSize: "1.75rem", fontWeight: 600, marginBottom: "0.5rem" }}>
+          Upload a Document
         </h1>
-        <p style={{ color: "#6b7280", marginBottom: "2.5rem", fontSize: "1.1rem" }}>
-          Upload a legal document. We&apos;ll explain it in plain language — no jargon.
+        <p style={{ color: "#6b7280", marginBottom: "2.5rem", fontSize: "1.05rem" }}>
+          We&apos;ll explain it in plain language — no jargon.
         </p>
 
         <DocumentUpload onUpload={handleUpload} loading={loading} />
