@@ -106,6 +106,18 @@ export default function AuthModal({ onClose, onComplete }: AuthModalProps) {
     onComplete();
   }
 
+  async function handleGuest() {
+    setLoading(true);
+    setError(null);
+    const { error } = await supabase.auth.signInAnonymously();
+    setLoading(false);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    onComplete();
+  }
+
   function switchMode(newMode: Mode) {
     setMode(newMode);
     setSignupStep("credentials");
@@ -177,6 +189,10 @@ export default function AuthModal({ onClose, onComplete }: AuthModalProps) {
                 Sign up
               </button>
             </div>
+            <div className="auth-divider"><span>or</span></div>
+            <button type="button" className="auth-guest" onClick={handleGuest} disabled={loading}>
+              Continue as Guest
+            </button>
           </form>
         )}
 
@@ -224,6 +240,10 @@ export default function AuthModal({ onClose, onComplete }: AuthModalProps) {
                 Sign in
               </button>
             </div>
+            <div className="auth-divider"><span>or</span></div>
+            <button type="button" className="auth-guest" onClick={handleGuest} disabled={loading}>
+              Continue as Guest
+            </button>
           </form>
         )}
 

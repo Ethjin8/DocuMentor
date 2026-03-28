@@ -49,7 +49,8 @@ export async function answerQuestion(
   question: string,
   history: { role: "user" | "model"; parts: { text: string }[] }[],
   language?: string,
-  readingLevel?: number
+  readingLevel?: number,
+  region?: string
 ): Promise<string> {
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
@@ -60,12 +61,16 @@ export async function answerQuestion(
     : readingLevel === 3 ? " Provide thorough explanations with relevant legal context. You may use legal terms but define them."
     : "";
 
+  const regionHint = region
+    ? ` The user is located in ${region}. When relevant, reference the specific laws, tenant rights, employment rules, or legal protections that apply in ${region}.`
+    : "";
+
   const systemText = lang
     ? `You are a plain-language legal assistant. The user has uploaded a legal document.
 CRITICAL LANGUAGE RULE: You MUST respond ONLY in ${lang}. Every word of your response must be in ${lang}. Do NOT use English at all. If the user writes in any language, always reply in ${lang}.
-Answer questions clearly and simply. Avoid legal jargon. Use plain ${lang}.${levelHint}`
+Answer questions clearly and simply. Avoid legal jargon. Use plain ${lang}.${levelHint}${regionHint}`
     : `You are a plain-language legal assistant. The user has uploaded a legal document.
-Answer questions about it clearly and simply. Avoid jargon.${levelHint}`;
+Answer questions about it clearly and simply. Avoid jargon.${levelHint}${regionHint}`;
 
   const chat = model.startChat({
     history: [

@@ -416,6 +416,42 @@ a:hover {
   text-decoration: underline;
 }
 
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #9ca3af;
+  font-size: 0.8rem;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #e5e7eb;
+}
+
+.auth-guest {
+  width: 100%;
+  padding: 0.65rem;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 9px;
+  background: #fff;
+  color: #374151;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.auth-guest:hover {
+  border-color: #2563eb;
+  background: #f9fafb;
+}
+.auth-guest:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
 /* Language dropdown */
 .auth-select {
   padding: 0.7rem 0.85rem;

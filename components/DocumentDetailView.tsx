@@ -66,9 +66,10 @@ export default function DocumentDetailView({ doc, faq }: Props) {
   const [readingLevel, setReadingLevel] = useState<number>(2);
   const clientRef = useRef<GeminiLiveClient | null>(null);
 
-  // Fetch user's preferred language and reading level
+  // Fetch user preferences + stored chat history
   useEffect(() => {
     const supabase = createClient();
+
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return;
       const lang = user.user_metadata?.language;
@@ -81,16 +82,33 @@ export default function DocumentDetailView({ doc, faq }: Props) {
         .single();
       if (profile?.reading_level) setReadingLevel(profile.reading_level);
     });
-  }, []);
+
+    // Load stored chat logs for this document
+    supabase
+      .from("chat_messages")
+      .select("role, content, created_at")
+      .eq("document_id", doc.id)
+      .order("created_at", { ascending: true })
+      .then(({ data }) => {
+        if (!data || data.length === 0) return;
+        const loaded: ChatMessage[] = data.map((m) => ({
+          role: m.role as "user" | "model",
+          text: m.content,
+          timestamp: new Date(m.created_at),
+        }));
+        setVoiceMessages(loaded);
+        savedVoiceCountRef.current = loaded.length;
+      });
+  }, [doc.id]);
+
+  // Track how many voice messages have already been persisted
+  const savedVoiceCountRef = useRef(0);
 
   // Set up GeminiLiveClient
   useEffect(() => {
     const client = new GeminiLiveClient();
     clientRef.current = client;
 
-    client.on("stateChange", (s) => {
-      setVoiceState(s);
-    });
     client.on("transcript", (t) => {
       setVoiceMessages((prev) => {
         const last = prev[prev.length - 1];
@@ -100,10 +118,36 @@ export default function DocumentDetailView({ doc, faq }: Props) {
         return [...prev, { role: t.role, text: t.text, timestamp: new Date() }];
       });
     });
+
     client.on("error", (err) => {
       console.error("Voice error:", err);
       setVoiceError(err);
       setTimeout(() => setVoiceError(null), 5000);
+    });
+
+    client.on("stateChange", (s) => {
+      setVoiceState(s);
+      if (s === "idle") {
+        // Save all unsaved complete turns when the session ends
+        setVoiceMessages((prev) => {
+          const unsaved = prev.slice(savedVoiceCountRef.current);
+          if (unsaved.length === 0) return prev;
+
+          const supabase = createClient();
+          const rows = unsaved
+            .filter((m) => m.text.trim())
+            .map((m) => ({ document_id: doc.id, role: m.role, content: m.text }));
+
+          if (rows.length > 0) {
+            supabase.from("chat_messages").insert(rows).then(({ error }) => {
+              if (error) console.error("voice chat_messages insert error:", error.message);
+            });
+            savedVoiceCountRef.current = prev.length;
+          }
+
+          return prev;
+        });
+      }
     });
 
     return () => { client.disconnect(); };

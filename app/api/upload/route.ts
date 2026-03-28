@@ -48,12 +48,15 @@ export async function POST(req: NextRequest) {
       .getPublicUrl(filePath);
 
     // 3. Save document record
+    const { data: { user } } = await supabase.auth.getUser();
+
     const { data: doc, error: docError } = await supabase
       .from("documents")
       .insert({
         file_name: file.name,
         file_url: urlData?.publicUrl ?? "",
         raw_text: rawText,
+        user_id: user?.id ?? null,
       })
       .select()
       .single();
