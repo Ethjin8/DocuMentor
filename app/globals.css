@@ -1,0 +1,43 @@
+@import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600&family=Merriweather:wght@400;700&display=swap');
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html, body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  background: #ffffff;
+  color: #1a1a2e;
+  font-family: 'Source Sans 3', sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+/* Document text rendered with Merriweather */
+.doc-text {
+  font-family: 'Merriweather', serif;
+}
+
+a {
+  color: #2563eb;
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+/* Utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
