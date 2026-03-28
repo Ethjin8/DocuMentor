@@ -71,8 +71,17 @@ function getLanguageCode(language?: string): string {
   return LANGUAGE_CODES[language] ?? "en-US";
 }
 
-function buildSystemPrompt(language?: string): string {
+function getReadingLevelInstruction(level?: number): string {
+  switch (level) {
+    case 1: return "READING LEVEL: Simple. Use short sentences and basic vocabulary. Explain as if speaking to someone with no legal background. Avoid all jargon.";
+    case 3: return "READING LEVEL: Detailed. Provide thorough explanations with relevant legal context and nuance. You may use legal terms but always define them clearly.";
+    default: return "READING LEVEL: Standard. Use plain language and avoid jargon. Be clear and concise.";
+  }
+}
+
+function buildSystemPrompt(language?: string, readingLevel?: number): string {
   const lang = language && language !== "English" ? language : null;
+  const levelInstruction = getReadingLevelInstruction(readingLevel);
 
   if (lang) {
     return `You are a friendly, patient legal document assistant for LegalEase.
@@ -80,17 +89,19 @@ The user has uploaded a legal document and wants to understand it.
 
 CRITICAL LANGUAGE RULE: You MUST speak and respond ONLY in ${lang}. Every word you say must be in ${lang}. Do NOT use English at all — not even for greetings, transitions, or filler words. If the user speaks in any language, always reply in ${lang}.
 
+${levelInstruction}
+
 Speak clearly at an even pace, pausing between sentences.
-Use plain, simple ${lang} — avoid legal jargon.
-Keep answers concise but thorough.`;
+Use plain, simple ${lang} — avoid legal jargon.`;
   }
 
   return `You are a friendly, patient legal document assistant for LegalEase.
 The user has uploaded a legal document and wants to understand it.
+
+${levelInstruction}
+
 Speak clearly at an even pace, pausing between sentences.
-Use plain language — avoid legal jargon.
-If the user is a non-native English speaker, be extra clear.
-Keep answers concise but thorough.`;
+If the user is a non-native English speaker, be extra clear.`;
 }
 
 const wss = new WebSocketServer({ port: PORT });
@@ -112,6 +123,7 @@ wss.on("connection", (client: WebSocket) => {
     if (msg.type === "init" && !gemini) {
       const documentId = msg.documentId;
       const language = msg.language;
+      const readingLevel = msg.readingLevel;
       if (!documentId || typeof documentId !== "string") {
         client.send(JSON.stringify({ error: "Invalid documentId" }));
         client.close();
@@ -156,7 +168,7 @@ wss.on("connection", (client: WebSocket) => {
             systemInstruction: {
               parts: [
                 {
-                  text: `${buildSystemPrompt(language)}\n\nDocument content:\n${docText}`,
+                  text: `${buildSystemPrompt(language, readingLevel)}\n\nDocument content:\n${docText}`,
                 },
               ],
             },

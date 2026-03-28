@@ -63,14 +63,23 @@ export default function DocumentDetailView({ doc, faq }: Props) {
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [voiceMessages, setVoiceMessages] = useState<ChatMessage[]>([]);
   const [language, setLanguage] = useState<string>("English");
+  const [readingLevel, setReadingLevel] = useState<number>(2);
   const clientRef = useRef<GeminiLiveClient | null>(null);
 
-  // Fetch user's preferred language
+  // Fetch user's preferred language and reading level
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      const lang = user?.user_metadata?.language;
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return;
+      const lang = user.user_metadata?.language;
       if (lang) setLanguage(lang);
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("reading_level")
+        .eq("id", user.id)
+        .single();
+      if (profile?.reading_level) setReadingLevel(profile.reading_level);
     });
   }, []);
 
@@ -104,7 +113,7 @@ export default function DocumentDetailView({ doc, faq }: Props) {
     const client = clientRef.current;
     if (!client) return;
     if (voiceState === "idle") {
-      client.connect(doc.id, language);
+      client.connect(doc.id, language, readingLevel);
     } else {
       client.disconnect();
     }
@@ -218,6 +227,7 @@ export default function DocumentDetailView({ doc, faq }: Props) {
             voiceState={voiceState}
             voiceError={voiceError}
             language={language}
+            readingLevel={readingLevel}
           />
         )}
 

@@ -11,6 +11,7 @@ interface Props {
   voiceState: VoiceState;
   voiceError: string | null;
   language: string;
+  readingLevel: number;
 }
 
 function TypingIndicator() {
@@ -72,7 +73,7 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
   );
 }
 
-export default function VoiceChat({ documentId, voiceMessages, voiceState, voiceError, language }: Props) {
+export default function VoiceChat({ documentId, voiceMessages, voiceState, voiceError, language, readingLevel }: Props) {
   const [textMessages, setTextMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -100,7 +101,7 @@ export default function VoiceChat({ documentId, voiceMessages, voiceState, voice
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ documentId, question: text, history: allMessages, language }),
+        body: JSON.stringify({ documentId, question: text, history: allMessages, language, readingLevel }),
       });
       const json = await res.json();
       const answer = json.answer ?? "Sorry, I couldn't get an answer. Please try again.";
