@@ -65,6 +65,15 @@ create table if not exists public.research_results (
   created_at   timestamptz default now()
 );
 
+-- Chat messages table
+create table if not exists public.chat_messages (
+  id           uuid primary key default gen_random_uuid(),
+  document_id  uuid references public.documents(id) on delete cascade,
+  role         text not null check (role in ('user', 'model')),
+  content      text not null,
+  created_at   timestamptz default now()
+);
+
 -- Storage bucket for documents
 insert into storage.buckets (id, name, public)
 values ('documents', 'documents', true)
@@ -75,6 +84,7 @@ alter table public.profiles enable row level security;
 alter table public.documents enable row level security;
 alter table public.faqs enable row level security;
 alter table public.research_results enable row level security;
+alter table public.chat_messages enable row level security;
 
 -- Profiles: users can only read/update their own row
 create policy "Users can view own profile"   on public.profiles for select using (auth.uid() = id);
@@ -83,3 +93,4 @@ create policy "Users can update own profile" on public.profiles for update using
 create policy "Allow all for now" on public.documents for all using (true);
 create policy "Allow all for now" on public.faqs for all using (true);
 create policy "Allow all for now" on public.research_results for all using (true);
+create policy "Allow all for now" on public.chat_messages for all using (true);

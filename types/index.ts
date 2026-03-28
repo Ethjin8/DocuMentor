@@ -57,3 +57,11 @@ export interface ChatMessage {
   text: string;
   timestamp: Date;
 }
+
+export interface StoredChatMessage {
+  id: string;
+  document_id: string;
+  role: "user" | "model";
+  content: string;
+  created_at: string;
+}
