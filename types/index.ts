@@ -1,3 +1,15 @@
+export type ReadingLevel = 1 | 2 | 3; // 1 = Simple, 2 = Intermediate, 3 = Advanced
+
+export interface Profile {
+  id: string;
+  name: string;
+  email: string;
+  region: string;
+  reading_level: ReadingLevel;
+  created_at: string;
+  updated_at: string;
+}
+
 export type DocumentCategory =
   | "rental"
   | "employment"
