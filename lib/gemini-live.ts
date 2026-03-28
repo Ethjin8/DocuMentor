@@ -16,10 +16,12 @@ export class GeminiLiveClient {
   private state: VoiceState = "idle";
   private listeners: { [K in keyof EventMap]?: Listener<K>[] } = {};
 
-  // Audio playback queue
+  // Audio playback — schedule contiguously to avoid gaps
   private playbackQueue: AudioBuffer[] = [];
   private isPlaying = false;
+  private nextPlayTime = 0;
   private currentSource: AudioBufferSourceNode | null = null;
+  private turnComplete = false;
 
   on<K extends keyof EventMap>(event: K, fn: Listener<K>) {
     if (!this.listeners[event]) this.listeners[event] = [];
@@ -143,6 +145,9 @@ export class GeminiLiveClient {
 
     // Audio data from model
     if (sc.modelTurn?.parts) {
+      if (this.state !== "speaking") {
+        this.turnComplete = false;
+      }
       for (const part of sc.modelTurn.parts) {
         if (part.inlineData?.data) {
           this.setState("speaking");
@@ -163,16 +168,17 @@ export class GeminiLiveClient {
 
     // Model turn complete
     if (sc.turnComplete) {
-      // After playback finishes, go back to listening
+      this.turnComplete = true;
       if (!this.isPlaying) {
         this.setState("listening");
       }
-      // Otherwise, playNextBuffer will set state to listening when queue empties
     }
 
     // Model was interrupted
     if (sc.interrupted) {
       this.playbackQueue = [];
+      this.nextPlayTime = 0;
+      this.turnComplete = false;
       if (this.currentSource) {
         this.currentSource.stop();
         this.currentSource = null;
@@ -192,36 +198,47 @@ export class GeminiLiveClient {
       float32[i] = int16[i] / (int16[i] < 0 ? 0x8000 : 0x7fff);
     }
 
-    const buffer = this.audioContext.createBuffer(1, float32.length, 16000);
+    const buffer = this.audioContext.createBuffer(1, float32.length, 24000);
     buffer.copyToChannel(float32, 0);
-    this.playbackQueue.push(buffer);
 
-    if (!this.isPlaying) {
-      this.playNextBuffer();
-    }
+    this.scheduleBuffer(buffer);
   }
 
-  private playNextBuffer() {
-    if (!this.audioContext || this.playbackQueue.length === 0) {
-      this.isPlaying = false;
-      // If model is done, go back to listening
-      if (this.state === "speaking") {
-        this.setState("listening");
-      }
-      return;
+  private scheduleBuffer(buffer: AudioBuffer) {
+    if (!this.audioContext) return;
+
+    const now = this.audioContext.currentTime;
+
+    // If nothing is scheduled or we've fallen behind, start from now with a small buffer
+    if (this.nextPlayTime <= now) {
+      this.nextPlayTime = now + 0.02; // 20ms buffer to avoid underrun
     }
 
-    this.isPlaying = true;
-    const buffer = this.playbackQueue.shift()!;
     const source = this.audioContext.createBufferSource();
     source.buffer = buffer;
     source.connect(this.audioContext.destination);
+
+    const endTime = this.nextPlayTime + buffer.duration;
+
     source.onended = () => {
+      // Only the last buffer in the chain should trigger the transition
+      if (this.currentSource !== source) return;
       this.currentSource = null;
-      this.playNextBuffer();
+      this.isPlaying = false;
+
+      // If model turn is already complete, go back to listening
+      if (this.turnComplete) {
+        this.turnComplete = false;
+        if (this.state === "speaking") {
+          this.setState("listening");
+        }
+      }
     };
+
+    source.start(this.nextPlayTime);
+    this.nextPlayTime = endTime;
     this.currentSource = source;
-    source.start();
+    this.isPlaying = true;
   }
 
   disconnect() {
@@ -239,6 +256,8 @@ export class GeminiLiveClient {
 
     // Stop playback
     this.playbackQueue = [];
+    this.nextPlayTime = 0;
+    this.turnComplete = false;
     if (this.currentSource) {
       this.currentSource.stop();
       this.currentSource = null;

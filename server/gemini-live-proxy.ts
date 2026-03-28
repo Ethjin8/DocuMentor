@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { WebSocketServer, WebSocket } from "ws";
 import { createClient } from "@supabase/supabase-js";
 
@@ -21,7 +22,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const SYSTEM_PROMPT = `You are a friendly, patient legal document assistant for DocuMentor.
 The user has uploaded a legal document and wants to understand it.
-Speak clearly and slowly, pausing between sentences.
+Speak clearly at an even pace, pausing between sentences.
 Use plain language — avoid legal jargon.
 If the user is a non-native English speaker, be extra clear.
 Keep answers concise but thorough.`;
@@ -72,9 +73,18 @@ wss.on("connection", (client: WebSocket) => {
       gemini.on("open", () => {
         // Send config as first message
         const config = {
-          config: {
-            model: "models/gemini-3.0-flash-live-preview",
-            responseModalities: ["AUDIO"],
+          setup: {
+            model: "models/gemini-3.1-flash-live-preview",
+            generationConfig: {
+              responseModalities: ["AUDIO"],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: {
+                    voiceName: "Puck",
+                  }
+                }
+              }
+            },
             systemInstruction: {
               parts: [
                 {
@@ -93,13 +103,15 @@ wss.on("connection", (client: WebSocket) => {
 
       // Relay Gemini → Client
       gemini.on("message", (data: Buffer) => {
+        const text = data.toString();
+        console.log("Gemini →", text.slice(0, 200));
         if (client.readyState === WebSocket.OPEN) {
-          client.send(data.toString());
+          client.send(text);
         }
       });
 
-      gemini.on("close", () => {
-        console.log("Gemini session closed");
+      gemini.on("close", (code, reason) => {
+        console.log(`Gemini session closed (code: ${code}, reason: ${reason?.toString()})`);
         if (client.readyState === WebSocket.OPEN) {
           client.close();
         }
