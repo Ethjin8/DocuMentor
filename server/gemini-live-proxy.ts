@@ -149,6 +149,8 @@ wss.on("connection", (client: WebSocket) => {
       // Open Gemini Live WebSocket
       gemini = new WebSocket(GEMINI_WS_URL);
 
+      let setupComplete = false;
+
       gemini.on("open", () => {
         // Send config as first message
         const config = {
@@ -175,16 +177,31 @@ wss.on("connection", (client: WebSocket) => {
           },
         };
         gemini!.send(JSON.stringify(config));
-        console.log("Gemini session configured");
-
-        // Tell the client the session is ready
-        client.send(JSON.stringify({ type: "ready" }));
+        console.log("Gemini session configured, waiting for setupComplete...");
       });
 
       // Relay Gemini → Client
       gemini.on("message", (data: Buffer) => {
         const text = data.toString();
         console.log("Gemini →", text.slice(0, 200));
+
+        // Wait for Gemini to acknowledge setup before telling the client we're ready
+        if (!setupComplete) {
+          try {
+            const parsed = JSON.parse(text);
+            if (parsed.setupComplete !== undefined) {
+              setupComplete = true;
+              console.log("Gemini setup complete, client is now ready");
+              if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify({ type: "ready" }));
+              }
+              return; // Don't forward the setupComplete message itself
+            }
+          } catch {
+            // ignore parse errors
+          }
+        }
+
         if (client.readyState === WebSocket.OPEN) {
           client.send(text);
         }
