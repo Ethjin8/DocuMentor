@@ -111,7 +111,7 @@ public/animation/             # Mascot sprite frames (56 PNGs)
 
 ### AI Models
 
-- **Text (FAQ, Q&A, Research):** `gemini-2.5-flash` via `lib/gemini.ts`
+- **Text (FAQ, Q&A, Research):** `gemini-3-flash-preview` via `lib/gemini.ts`
 - **Voice:** `gemini-3.1-flash-live-preview` via WebSocket in `lib/gemini-live.ts`
 - **Ephemeral tokens:** Generated server-side at `/api/token` using `@google/genai`
 

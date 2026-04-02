@@ -9,7 +9,7 @@ Upload a document. Get an instant FAQ. Talk to it.
 ## Features
 
 - **Instant FAQ Generation** — Upload a PDF or text file and get a plain-language summary, key dates, obligations, and Q&A within seconds
-- **Voice Conversations** — Talk to your document using Gemini Live with real-time voice input and text-to-speech responses
+- **Voice Conversations** — Talk to your document using Gemini 3.1 Flash Live with real-time bidirectional audio streaming
 - **Text Chat** — Ask follow-up questions via text with full conversation history
 - **40+ Languages** — Full multilingual support for UI, voice, and AI responses
 - **Reading Level Adaptation** — Responses adjust from simple (no jargon) to detailed (legal context included)
@@ -31,12 +31,13 @@ Upload a document. Get an instant FAQ. Talk to it.
 
 | Layer | Technology |
 |-------|-----------|
-| Framework | Next.js 15 (App Router), React 19, TypeScript |
+| Framework | Next.js 15 (App Router), React 19, TypeScript 5 |
 | Database & Auth | Supabase (PostgreSQL + Auth + Storage) |
-| AI | Google Gemini 2.5 Flash (text), Gemini Live (voice) |
+| AI (Text) | Gemini 2.5 Flash via `@google/generative-ai` |
+| AI (Voice) | Gemini 3.1 Flash Live via direct WebSocket + ephemeral tokens |
 | Text Extraction | pdf-parse |
-| Voice | WebSocket proxy to Gemini Live API, Web Audio API |
-| Deployment | Vercel (Next.js app), Railway (voice proxy) |
+| Testing | Vitest 4 |
+| Deployment | Vercel |
 
 ---
 
@@ -73,11 +74,7 @@ Run the database schema in your Supabase SQL Editor:
 ### Run
 
 ```bash
-# Terminal 1 — Next.js app (port 3000)
 npm run dev
-
-# Terminal 2 — Gemini Live voice proxy (port 3001)
-npm run dev:proxy
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
@@ -93,16 +90,19 @@ Client (Browser)
 └── Document View        ← Three tabs: Overview (FAQ), Ask AI (voice/text), Full Text
       │
       ├── FAQ Panel      ← Summary, key dates, obligations, expandable Q&A
-      ├── Voice Chat     ← Gemini Live via WebSocket proxy
+      ├── Voice Chat     ← Direct WebSocket to Gemini Live via ephemeral token
       └── Text Chat      ← REST API with conversation history
 
 API Routes
 ├── /api/upload          ← File upload → text extraction → FAQ generation → Supabase insert
-└── /api/chat            ← Text Q&A with language/reading level/region context
+├── /api/chat            ← Text Q&A with language/reading level/region context
+├── /api/token           ← Ephemeral Gemini token for voice sessions
+└── /api/documents       ← List, rename, delete documents
 
 Voice Pipeline
-Browser ←WebSocket→ gemini-live-proxy (port 3001) ←WebSocket→ Gemini Live API
-         (PCM audio at 16kHz, bidirectional streaming)
+Browser → /api/token (ephemeral token) → Direct WebSocket → Gemini Live API
+           AudioWorklet (48kHz mic) → downsample to 16kHz PCM → stream to Gemini
+           Gemini response (24kHz audio) → gap-free playback scheduling
 ```
 
 ### Database Schema
@@ -122,9 +122,16 @@ Browser ←WebSocket→ gemini-live-proxy (port 3001) ←WebSocket→ Gemini Liv
 app/
   page.tsx                    Landing page
   layout.tsx                  Root layout
+  (app)/                      Protected route group
+    workspace/page.tsx        Document list & upload
+    document/[id]/page.tsx    Document detail view
+    settings/page.tsx         User preferences
   api/
     upload/route.ts           Text extraction → FAQ generation → DB insert
     chat/route.ts             Text Q&A endpoint
+    token/route.ts            Ephemeral Gemini token for voice
+    documents/route.ts        List documents
+    documents/[id]/route.ts   Delete/rename document
 components/
   AuthModal.tsx               Login/signup with language, region, reading level
   Sidebar.tsx                 Document list, search, upload, settings
@@ -133,18 +140,20 @@ components/
   FAQPanel.tsx                FAQ accordion with summary, dates, obligations
   VoiceChat.tsx               Voice + text chat interface
   MicOverlay.tsx              Mic button with state animations
+  MarkdownRenderer.tsx        Lightweight markdown renderer
   MascotAnimation.tsx         Landing page character animation
+  TransitionReveal.tsx        Page transition animation
+  WorkspaceView.tsx           Upload-focused workspace view
 lib/
   gemini.ts                   AI functions (generateFAQ, answerQuestion)
-  gemini-live.ts              Gemini Live WebSocket client (voice)
-  ocr.ts                      Text extraction utilities (PDF via pdf-parse)
+  gemini-live.ts              Direct WebSocket client for Gemini Live (voice)
+  voice-config.ts             42 language mappings, reading level prompts
+  ocr.ts                      Text extraction utilities
   supabase/                   Browser + server Supabase clients
-server/
-  gemini-live-proxy.ts        WebSocket proxy between browser and Gemini Live API
 supabase/
   schema.sql                  Database tables, RLS policies, storage bucket
 public/
-  pcm-worklet.js              Audio worklet for real-time mic processing
+  pcm-worklet.js              AudioWorklet for real-time mic processing
   animation/                  Mascot sprite frames
 ```
 
@@ -157,8 +166,6 @@ public/
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase Dashboard → Settings → API |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase Dashboard → Settings → API |
 | `GEMINI_API_KEY` | [Google AI Studio](https://aistudio.google.com/app/apikey) |
-| `PROXY_PORT` | Voice proxy port (default: `3001`) |
-| `NEXT_PUBLIC_PROXY_PORT` | Client-side proxy port reference (default: `3001`) |
 
 ---
 
@@ -167,8 +174,7 @@ public/
 | Command | Description |
 |---------|-------------|
 | `npm run dev` | Start Next.js dev server |
-| `npm run dev:proxy` | Start Gemini Live voice proxy |
 | `npm run build` | Production build |
 | `npm run start` | Start production server |
-| `npm run start:proxy` | Start voice proxy (production) |
 | `npm run lint` | Run ESLint |
+| `npx vitest run` | Run tests |
