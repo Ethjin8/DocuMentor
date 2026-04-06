@@ -400,11 +400,12 @@ export default function Sidebar() {
       <div style={{ padding: "0 0.75rem 1rem" }}>
         <button
           onClick={async () => {
-            window.dispatchEvent(new Event("curtain-close"));
-            await new Promise((r) => setTimeout(r, 600));
             const supabase = createClient();
             await supabase.auth.signOut();
-            router.push("/");
+            window.dispatchEvent(new Event("curtain-close"));
+            setTimeout(() => {
+              router.push("/");
+            }, 700);
           }}
           style={{
             width: "100%",
